@@ -20,16 +20,17 @@
 
     Active TornadIO2 connection session.
 """
-
-import urlparse
+import sys
 import logging
+from tornado.web import HTTPError
+from tornadio2 import sessioncontainer, proto, periodic, stats
 
+if sys.version_info[0] > 2:
+    from urllib.parse import urlparse
+else:
+    import urlparse
 
 logger = logging.getLogger('tornadio2.session')
-
-from tornado.web import HTTPError
-
-from tornadio2 import sessioncontainer, proto, periodic, stats
 
 
 class ConnectionInfo(object):
@@ -46,6 +47,7 @@ class ConnectionInfo(object):
     `arguments`
         Collection of the query string arguments
     """
+
     def __init__(self, ip, arguments, cookies):
         self.ip = ip
         self.cookies = cookies
@@ -75,6 +77,7 @@ class Session(sessioncontainer.SessionBase):
     `is_closed`
         Check if session is closed or not.
     """
+
     def __init__(self, conn, server, request, expiry=None):
         """Session constructor.
 
@@ -104,8 +107,8 @@ class Session(sessioncontainer.SessionBase):
 
         # Call on_open.
         self.info = ConnectionInfo(request.remote_ip,
-                              request.arguments,
-                              request.cookies)
+                                   request.arguments,
+                                   request.cookies)
 
         # If everything is fine - continue
         self.send_message(proto.connect())
@@ -150,10 +153,10 @@ class Session(sessioncontainer.SessionBase):
         # If IP address don't match - refuse connection
         if self.server.settings['verify_remote_ip'] and handler.request.remote_ip != self.remote_ip:
             logger.error('Attempted to attach to session %s (%s) from different IP (%s)' % (
-                          self.session_id,
-                          self.remote_ip,
-                          handler.request.remote_ip
-                          ))
+                self.session_id,
+                self.remote_ip,
+                handler.request.remote_ip
+            ))
             return False
 
         # Associate handler and promote
@@ -289,7 +292,10 @@ class Session(sessioncontainer.SessionBase):
         `url`
             socket.io endpoint URL.
         """
-        urldata = urlparse.urlparse(url)
+        if sys.version_info[0] > 2:
+            urldata = urlparse(url)
+        else:
+            urldata = urlparse.urlparse(url)
 
         endpoint = urldata.path
 
@@ -305,7 +311,7 @@ class Session(sessioncontainer.SessionBase):
 
         self.send_message(proto.connect(endpoint))
 
-        if conn.on_open(self.info) == False:
+        if not conn.on_open(self.info):
             self.disconnect_endpoint(endpoint)
 
     def disconnect_endpoint(self, endpoint):
